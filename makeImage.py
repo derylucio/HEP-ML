@@ -19,8 +19,8 @@ def makeImage(filename):
             row = ETA_START + int(float(entry[1])*10)
             col = PHI_START - int(float(entry[2])*10)
             result[row][col] += pT_val
-    new_filename = "images/" + filename.split("/")[1]
+    new_filename = "imagecsv/" + filename.split("/")[1]
     np.savetxt(new_filename, result, delimiter=",")
 
-for filename in glob.glob("tracks/*.csv"):
+for filename in glob.glob("tracks2/*.csv"):
     makeImage(filename)
