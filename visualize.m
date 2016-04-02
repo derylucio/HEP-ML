@@ -1,12 +1,18 @@
-image = csvread('imagecsv/ggf6383.csv');
-figure;
-imagesc(image);
+directory = dir('imagecsv');
+names = {directory.name};
 mymap = jet;
-for i = 1:3
-    mymap(1,i) = 1;
+mymap(1, : ) = 1;
+for i = 4: size(names, 2)
+    title = strcat('imagecsv/', names(i));
+    image = csvread(title{1});
+    figure;
+    imagesc(image);
+    colormap(mymap);
+    set(gca, 'xtick', [])
+    set(gca, 'ytick', [])
+    colorbar
+    event = names(i);
+    title = strsplit(event{1}, '.');
+    location = strcat('images/', title{1});
+    savefig(location)
 end
-colormap(mymap);
-set(gca, 'xtick', [])
-set(gca, 'ytick', [])
-colorbar
-savefig('images/ggf6383')
