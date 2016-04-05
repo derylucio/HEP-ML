@@ -8,10 +8,10 @@ vbf_dir = dir('vbfcsv');
 vbf = {vbf_dir.name};
 mymap = jet;
 mymap(1, : ) = 1;
-for i = 4: size(none, 2)
+for i = 4: size(vbf, 2)
     clear title
     figure(1)
-    ptitle = strcat('nonecsv/', none(i));
+    ptitle = strcat('nonecsv/', none(i - 1));
     image = csvread(ptitle{1});
     subplot(2, 2, 1)
     imagesc(image')
@@ -66,7 +66,7 @@ for i = 4: size(none, 2)
     ylabel('phi')
     title('VBFJet')
     
-    event = none(i);
+    event = none(i - 1);
     title = strsplit(event{1}, '.');
     location = strcat('QuadPlots/', title{1});
     savefig(location)
