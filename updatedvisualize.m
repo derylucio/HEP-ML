@@ -8,8 +8,7 @@ vbf_dir = dir('vbfcsv');
 vbf = {vbf_dir.name};
 mymap = jet;
 mymap(1, : ) = 1;
-i = 4
-% for i = 4: size(none, 2)
+for i = 4: size(none, 2)
     clear title
     figure(1)
     ptitle = strcat('nonecsv/', none(i));
@@ -20,7 +19,7 @@ i = 4
     set(gca, 'xtick' , 0:10:50)
     set(gca, 'xticklabel', {'-2.5', '-1.5', '-0.5', '0.5', '1.5', '2.5'})
     set(gca, 'ytick' , 0:12.6:63)
-    set(gca, 'yticklabel', {'-3.14', '-2.14', '-1.14', '1.5', '2.5'})
+    set(gca, 'yticklabel', {'3.15', '1.89', '0.63', '-0.63', '-1.89', '-3.15'})
     xlabel('eta')
     ylabel('phi')
     title('Background')
@@ -30,6 +29,10 @@ i = 4
     subplot(2, 2, 2)
     imagesc(image') 
     colorbar
+    set(gca, 'xtick' , 0:10:50)
+    set(gca, 'xticklabel', {'-2.5', '-1.5', '-0.5', '0.5', '1.5', '2.5'})
+    set(gca, 'ytick' , 0:12.6:63)
+    set(gca, 'yticklabel', {'3.15', '1.89', '0.63', '-0.63', '-1.89', '-3.15'})
     xlabel('eta')
     ylabel('phi')
     title('BJet')
@@ -40,6 +43,10 @@ i = 4
     subplot(2, 2, 3)
     imagesc(image')
     colorbar
+    set(gca, 'xtick' , 0:10:50)
+    set(gca, 'xticklabel', {'-2.5', '-1.5', '-0.5', '0.5', '1.5', '2.5'})
+    set(gca, 'ytick' , 0:12.6:63)
+    set(gca, 'yticklabel', {'3.15', '1.89', '0.63', '-0.63', '-1.89', '-3.15'})
     xlabel('eta')
     ylabel('phi')
     title('BBellipse')
@@ -51,6 +58,10 @@ i = 4
     imagesc(image')
     colormap(mymap)
     colorbar
+    set(gca, 'xtick' , 0:10:50)
+    set(gca, 'xticklabel', {'-2.5', '-1.5', '-0.5', '0.5', '1.5', '2.5'})
+    set(gca, 'ytick' , 0:12.6:63)
+    set(gca, 'yticklabel', {'3.15', '1.89', '0.63', '-0.63', '-1.89', '-3.15'})
     xlabel('eta')
     ylabel('phi')
     title('VBFJet')
@@ -59,4 +70,4 @@ i = 4
     title = strsplit(event{1}, '.');
     location = strcat('QuadPlots/', title{1});
     savefig(location)
-% end
+end
