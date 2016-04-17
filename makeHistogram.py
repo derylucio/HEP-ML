@@ -6,7 +6,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 NUM_BUCKETS = 60
 PT_INDEX = 0
 
-tracks = glob.glob("tracks/*.csv")
+tracks = glob.glob("old_tracks/*.csv")
 
 def makeHistogram(filename):
     matrix = np.genfromtxt(filename, delimiter=",", skip_header=1)
@@ -16,6 +16,7 @@ def makeHistogram(filename):
     plt.title(title)
     plt.xlabel('pT[GeV]')
     plt.ylabel('Number of Tracks')
+    plt.xlim((0, 500))
     pp = PdfPages("Histograms/" + title + '.pdf')
     plt.savefig(pp, format='pdf')
     pp.close()
