@@ -18,9 +18,9 @@ for i in range(NUM_CRITICAL_POINTS):
 	false_pos = np.sum(vbf_passes)/num_vbf
 	efficiencies[i, 0] = true_pos
 	efficiencies[i, 1] = false_pos
-plt.ylabel('False Positive Rate (incorrectly classified VBF)')
-plt.xlabel('True Positive Rate (correctly classified GGF)')
-plt.plot(efficiencies[:,0], efficiencies[:,1])
+plt.xlabel('False Positive Rate (incorrectly classified VBF)')
+plt.ylabel('True Positive Rate (correctly classified GGF)')
+plt.plot(efficiencies[:,1], efficiencies[:,0])
 title = "HTSoft Graph"
 pp = PdfPages(title + ".pdf")
 plt.savefig(pp, format="pdf")

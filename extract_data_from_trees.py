@@ -2,6 +2,8 @@ import numpy as np
 from root_numpy import root2rec
 
 BACKGROUND_INDEX = 0
+DIM_ETA = 50
+DIM_PHI = 63
 
 def get_unprocesseddata():
     leaves = ["trk_pt", "trk_phi", "trk_eta", "trk_e", "trk_code"]
@@ -14,8 +16,6 @@ def extract_imagedata():
     #labels : a NUM_SAMPLE x 1 vector of labels corresponding to these images 0 for vbf and 1 for ggf
 
     #based on bin size of 0.1x0.1
-    DIM_ETA = 50
-    DIM_PHI = 63
     x_edges, y_edges = np.linspace(-2.5, 2.5, 51), np.linspace(-3.2, 3.16, 64)
 
     unprocessed_data = get_unprocesseddata()
