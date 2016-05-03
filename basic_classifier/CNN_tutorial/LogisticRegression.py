@@ -1,5 +1,6 @@
 import theano
 from theano import tensor as T 
+import numpy as np
 
 class LogisticRegression(object):
     """Multi-class Logistic Regression Class
@@ -29,7 +30,7 @@ class LogisticRegression(object):
         # start-snippet-1
         # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
         self.W = theano.shared(
-            value=numpy.zeros(
+            value=np.zeros(
                 (n_in, n_out),
                 dtype=theano.config.floatX
             ),
@@ -38,7 +39,7 @@ class LogisticRegression(object):
         )
         # initialize the biases b as a vector of n_out 0s
         self.b = theano.shared(
-            value=numpy.zeros(
+            value=np.zeros(
                 (n_out,),
                 dtype=theano.config.floatX
             ),

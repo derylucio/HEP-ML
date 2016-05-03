@@ -34,16 +34,16 @@ class LeNetConvPoolLayer(object):
 
         # there are "num input feature maps * filter height * filter width"
         # inputs to each hidden unit
-        fan_in = numpy.prod(filter_shape[1:])
+        fan_in = np.prod(filter_shape[1:])
         # each unit in the lower layer receives a gradient from:
         # "num output feature maps * filter height * filter width" /
         #   pooling size
-        fan_out = (filter_shape[0] * numpy.prod(filter_shape[2:]) //
-                   numpy.prod(poolsize))
+        fan_out = (filter_shape[0] * np.prod(filter_shape[2:]) //
+                   np.prod(poolsize))
         # initialize weights with random weights
-        W_bound = numpy.sqrt(6. / (fan_in + fan_out))
+        W_bound = np.sqrt(6. / (fan_in + fan_out))
         self.W = theano.shared(
-            numpy.asarray(
+            np.asarray(
                 rng.uniform(low=-W_bound, high=W_bound, size=filter_shape),
                 dtype=theano.config.floatX
             ),
@@ -51,7 +51,7 @@ class LeNetConvPoolLayer(object):
         )
 
         # the bias is a 1D tensor -- one bias per output feature map
-        b_values = numpy.zeros((filter_shape[0],), dtype=theano.config.floatX)
+        b_values = np.zeros((filter_shape[0],), dtype=theano.config.floatX)
         self.b = theano.shared(value=b_values, borrow=True)
 
         # convolve input feature maps with filters
@@ -79,4 +79,4 @@ class LeNetConvPoolLayer(object):
         self.params = [self.W, self.b]
 
         # keep track of model input
-        self.input = inputc
+        self.input = input
