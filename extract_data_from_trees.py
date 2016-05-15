@@ -7,10 +7,10 @@ DIM_PHI = 64
 
 def get_unprocesseddata():
     leaves = ["trk_pt", "trk_phi", "trk_eta", "trk_e", "trk_code"]
-    unprocessed_data = [root2rec("tracks/tree_ggf.root", "outtree", leaves),root2rec("tracks/tree_vbf.root", "outtree", leaves)]
+    unprocessed_data = [root2rec("tracks/tree_ggf.root", "outtree", leaves), root2rec("tracks/tree_vbf.root", "outtree", leaves)]
     return unprocessed_data
 
-def extract_imagedata(whole_img=False):
+def extract_imagedata(whole_img=False, normalization=0):
     #input: boolean to determine whether to extract whole image or just background
     #Output :
     #data_samples : a NUM_SAMPLES x DIM_PHI x DIM_ETA matrix of event images 
@@ -34,10 +34,19 @@ def extract_imagedata(whole_img=False):
         trk_pt  = unprocessed_data[0]["trk_pt"][i]
         trk_phi = unprocessed_data[0]["trk_phi"][i]
         trk_eta = unprocessed_data[0]["trk_eta"][i]
-        if  not whole_img:
+        if not whole_img:
             trk_pt, trk_phi, trk_eta = get_background_event(trk_pt, unprocessed_data[0]["trk_code"][i], trk_eta, trk_phi)
         result, dum_x_edges, dum_y_edges = np.histogram2d(trk_eta, trk_phi , bins=(x_edges, y_edges), range=None, normed=False, weights=trk_pt)
+        if normalization is 1:
+            result = result - np.mean(result)
+            result = result/ np.sqrt(np.sum(np.square(result)))
+        elif normalization is 0:
+            result = result/np.max(result)
+        elif normalization is 2:
+            HTSoft = np.sum(result)
+            result = result / HTSoft
         data_samples[i, :, :] =  np.flipud(result.T)  # to make eta increase from left to right and phi from bottom up.
+    
     for i in range(num_vbf):
         trk_pt  = unprocessed_data[1]["trk_pt"][i]
         trk_phi = unprocessed_data[1]["trk_phi"][i]
@@ -45,6 +54,14 @@ def extract_imagedata(whole_img=False):
         if not whole_img:
             trk_pt, trk_phi, trk_eta = get_background_event(trk_pt, unprocessed_data[1]["trk_code"][i], trk_eta, trk_phi)
         result, dum_x_edges, dum_y_edges = np.histogram2d(trk_eta, trk_phi, bins=(x_edges, y_edges), range=None, normed=False, weights=trk_pt)
+        if normalization is 1:
+            result = result - np.mean(result)
+            result = result/ np.sqrt(np.sum(np.square(result)))
+        elif normalization is 0:
+            result = result/np.max(result)
+        elif normalization is 2:
+            HTSoft = np.sum(result)
+            result = result / HTSoft
         data_samples[(i + num_ggf), :, :] =  np.flipud(result.T)  # to make eta increase from left to right and phi from bottom up.
 
     #shuffle the data
