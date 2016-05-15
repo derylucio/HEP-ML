@@ -53,8 +53,8 @@ class Config(object):
   lr = 1e-4
   final_size = 208
   batch_size = 128
-  num_train = 2432
-  max_epoch = 20
+  num_train = 896
+  max_epoch = 3
   early_stopping = 2
 
 class HEPModel(object):
