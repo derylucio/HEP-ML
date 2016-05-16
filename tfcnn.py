@@ -6,6 +6,8 @@ from sklearn.metrics import roc_curve
 from sklearn.metrics import auc
 import matplotlib.pyplot as plt 
 import sys
+from matplotlib.backends.backend_pdf import PdfPages
+
 
 #Iterate through the dataset
 def data_iterator(orig_X, orig_y=None, batch_size=32, label_size=2, shuffle=False):
@@ -53,8 +55,8 @@ class Config(object):
   lr = 1e-4
   final_size = 208
   batch_size = 128
-  num_train = 896
-  max_epoch = 3
+  num_train = 1024#2432
+  max_epoch = 20
   early_stopping = 2
 
 class HEPModel(object):
@@ -120,7 +122,7 @@ class HEPModel(object):
 
 	def add_model(self, input_data):
 		with tf.variable_scope("FirstConv") as CLayer1:
-			w_conv1 = tf.get_variable("w_conv1", (11 , 11, 1, 32), initializer=tf.truncated_normal_initializer(stddev=0.1))
+			w_conv1 = tf.get_variable("w_conv1", (11, 11, 1, 32), initializer=tf.truncated_normal_initializer(stddev=0.1))
 			b_conv1 = tf.get_variable("b_conv1", (32), initializer=tf.constant_initializer(0.1))
 			conv1 =   tf.nn.conv2d(input_data, w_conv1, strides=[1, 1, 1, 1], padding='SAME')
 			hconv1 =  tf.nn.relu(conv1 + b_conv1)
@@ -132,13 +134,13 @@ class HEPModel(object):
 				hconv2 =  tf.nn.relu(conv2 + b_conv2)
 				h_pool2 = tf.nn.max_pool(hconv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 				with tf.variable_scope("FullyConnected") as FC:
-					wfc1 = tf.get_variable("wfc1", (self.config.final_size*64, 1024), initializer=tf.truncated_normal_initializer(stddev=0.1))
-					bfc1 = tf.get_variable("bfc1", (1024), initializer=tf.constant_initializer(0.1))
+					wfc1 = tf.get_variable("wfc1", (self.config.final_size*64, 32), initializer=tf.truncated_normal_initializer(stddev=0.1))
+					bfc1 = tf.get_variable("bfc1", (32), initializer=tf.constant_initializer(0.1))
 					h_pool2_flat = tf.reshape(h_pool2, [-1, self.config.final_size*64])
 					h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, wfc1) + bfc1)
 					h_fc1_drop = tf.nn.dropout(h_fc1, self.dropout_placeholder)
 					with tf.variable_scope("ReadoutLayer") as RL:
-						wfc2 = tf.get_variable("wfc2", (1024, self.config.num_classes), initializer=tf.truncated_normal_initializer(stddev=0.1))
+						wfc2 = tf.get_variable("wfc2", (32, self.config.num_classes), initializer=tf.truncated_normal_initializer(stddev=0.1))
 						bfc2 = tf.get_variable("bfc2", (self.config.num_classes), initializer=tf.constant_initializer(0.1))
 						y_conv = tf.matmul(h_fc1_drop, wfc2) + bfc2
 		return y_conv
@@ -151,6 +153,9 @@ class HEPModel(object):
 	    Returns:
 	      loss: A 0-d tensor (scalar) output
 	    """
+	    #Hinge Loss
+	    #pred = tf.nn.softmax(pred)
+	    #loss = tf.reduce_mean(tf.maximum( 0.0, (1.0 - self.labels_placeholder)*pred - self.labels_placeholder*pred + 1.0 ))
 	    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(pred, self.labels_placeholder))
 	    return loss
 
@@ -245,19 +250,23 @@ class HEPModel(object):
 	      predicted_indices = preds.argmax(axis=1)
 	      results.extend(predicted_indices)
 
-	    print "NUM GGF predictions"
-	    print np.array(results).sum()
-	    print predictions_scores
-	    area_under_curve = roc_auc_score(input_classes, predictions_scores)
+	    flattened_classes = np.array(input_classes.argmax(axis=1))
+	    accuracy = sum(np.array(results) == flattened_classes)/float(len(flattened_classes))
+	    print 'Num vbf'
+	    print np.sum(flattened_classes)
+	    print 'Total objects'
+	    print len(flattened_classes)
+	    print 'Accuracy on Test'
+	    print accuracy
+	    indices = np.arange(flattened_classes.shape[0])
+	    corresponding_scores = predictions_scores[indices, flattened_classes]
+	    area_under_curve = roc_auc_score(flattened_classes, corresponding_scores)
 	    print 'Here is the roc_auc_score 1'
 	    print area_under_curve
 	    print 'Mean loss'
 	    print np.mean(losses)
-	    flattened_classes = np.array(input_classes.argmax(axis=1))
-	    indices = np.arange(flattened_classes.shape[0])
-	    print indices[1:5]
-	    print flattened_classes[1:5]
-	    corresponding_scores = predictions_scores[indices, flattened_classes]
+	    print flattened_classes[0:5]
+	    print corresponding_scores[0:5]
 	    fpr, tpr , thresholds = roc_curve(flattened_classes, corresponding_scores)
 	    plt.ylabel('True Positive Rate')
 	    plt.xlabel('False Positive Rate')
@@ -265,13 +274,17 @@ class HEPModel(object):
 	    print 'This is the area'
 	    print area
 	    plt.plot(fpr, tpr)
-	    title = "CNN Graph"
+	    title = "CNN Graph-CE-5050-16OUT"
 	    plt.figtext(.4, .5, "AUC : " + str(area))
+	    pp = PdfPages(title + ".pdf")
+	    plt.savefig(pp, format="pdf")
+	    pp.close()
 	    plt.show()
 	    return np.mean(losses), results
 
 
 config = Config()
+tf.reset_default_graph()
 with tf.Graph().as_default():
 	model = HEPModel(config)
 	init = tf.initialize_all_variables()
@@ -292,5 +305,4 @@ with tf.Graph().as_default():
           		break	
 
     	val_loss, predictions = model.predict(session, model.X_test, model.Y_test)
-
 
