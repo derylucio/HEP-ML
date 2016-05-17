@@ -55,7 +55,7 @@ class Config(object):
   lr = 1e-4
   final_size = 208
   batch_size = 128
-  num_train = 1024#2432
+  num_train = 1024 #2432
   max_epoch = 20
   early_stopping = 2
 
@@ -68,10 +68,13 @@ class HEPModel(object):
 	    """
 	    data_samples, labels = extract_imagedata(normalization=0)
 	    aug_data = data_samples.reshape((data_samples.shape[0], data_samples.shape[1], data_samples.shape[2], 1))
+	    print (data_samples.shape[0])
 	    self.X_train = aug_data[:self.config.num_train, :, :, :]
 	    self.Y_train = labels[:self.config.num_train, :]
-	    self.X_test = aug_data[(self.config.num_train + 1):, :, :, :]
-	    self.Y_test = labels[(self.config.num_train + 1): ,  :]
+	    self.X_test = aug_data[self.config.num_train:, :, :, :]
+	    print self.X_train.shape
+	    print self.X_test.shape
+	    self.Y_test = labels[self.config.num_train: ,  :]
 
 
 
@@ -134,15 +137,19 @@ class HEPModel(object):
 				hconv2 =  tf.nn.relu(conv2 + b_conv2)
 				h_pool2 = tf.nn.max_pool(hconv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 				with tf.variable_scope("FullyConnected") as FC:
+					flattend_input = tf.reshape(input_data, [self.config.batch_size, -1])
+					w_input = tf.get_variable("w_input", (self.config.DIM_ETA*self.config.DIM_PHI, 32), initializer=tf.truncated_normal_initializer(stddev=0.1))
 					wfc1 = tf.get_variable("wfc1", (self.config.final_size*64, 32), initializer=tf.truncated_normal_initializer(stddev=0.1))
-					bfc1 = tf.get_variable("bfc1", (32), initializer=tf.constant_initializer(0.1))
+					#bfc1 = tf.get_variable("bfc1", (32), initializer=tf.constant_initializer(0.1))
 					h_pool2_flat = tf.reshape(h_pool2, [-1, self.config.final_size*64])
-					h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, wfc1) + bfc1)
-					h_fc1_drop = tf.nn.dropout(h_fc1, self.dropout_placeholder)
+					h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, wfc1) + tf.matmul(flattend_input, w_input))#+ bfc1)
+					h_fc1_drop = tf.nn.dropout(h_fc1, self.dropout_placeholder) 
 					with tf.variable_scope("ReadoutLayer") as RL:
+						# flattend_input = tf.reshape(input_data, [self.config.batch_size, -1])
+						# w_input = tf.get_variable("w_input", (self.config.DIM_ETA*self.config.DIM_PHI, self.config.num_classes), initializer=tf.truncated_normal_initializer(stddev=0.1))
 						wfc2 = tf.get_variable("wfc2", (32, self.config.num_classes), initializer=tf.truncated_normal_initializer(stddev=0.1))
 						bfc2 = tf.get_variable("bfc2", (self.config.num_classes), initializer=tf.constant_initializer(0.1))
-						y_conv = tf.matmul(h_fc1_drop, wfc2) + bfc2
+						y_conv = tf.matmul(h_fc1_drop, wfc2)  + bfc2 #tf.matmul(flattend_input, w_input) #
 		return y_conv
 
 	def add_loss_op(self, pred):

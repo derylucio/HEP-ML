@@ -22,7 +22,7 @@ def extract_imagedata(whole_img=False, normalization=0):
     unprocessed_data = get_unprocesseddata()
     num_ggf = len(unprocessed_data[0])
     num_vbf = len(unprocessed_data[1])
-    total_samples = 2*num_ggf # + num_vbf
+    total_samples = 1408 #2*num_ggf # + num_vbf
     labels = np.zeros((total_samples, 2))
     # ggf are labelled 1 and vbf are labeled 0 
     # a -1 / 1 labelling might be preferable depending on architecture eg SVM
@@ -47,7 +47,7 @@ def extract_imagedata(whole_img=False, normalization=0):
             result = result / HTSoft
         data_samples[i, :, :] =  np.flipud(result.T)  # to make eta increase from left to right and phi from bottom up.
     
-    for i in range(num_ggf):#range(num_vbf):
+    for i in range(total_samples - num_ggf): #range(num_ggf):#range(num_vbf):
         trk_pt  = unprocessed_data[1]["trk_pt"][i]
         trk_phi = unprocessed_data[1]["trk_phi"][i]
         trk_eta = unprocessed_data[1]["trk_eta"][i]
