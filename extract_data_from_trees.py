@@ -7,7 +7,7 @@ DIM_PHI = 64
 
 def get_unprocesseddata():
     leaves = ["trk_pt", "trk_phi", "trk_eta", "trk_e", "trk_code"]
-    unprocessed_data = [root2rec("tracks/tree_ggf.root", "outtree", leaves), root2rec("tracks/tree_vbf.root", "outtree", leaves)]
+    unprocessed_data = [root2rec("tracks/outtree2_ggf.root", "outtree", leaves), root2rec("tracks/outtree2_vbf.root", "outtree", leaves)]
     return unprocessed_data
 
 def extract_imagedata(whole_img=False, normalization=0):
@@ -22,14 +22,13 @@ def extract_imagedata(whole_img=False, normalization=0):
     unprocessed_data = get_unprocesseddata()
     num_ggf = len(unprocessed_data[0])
     num_vbf = len(unprocessed_data[1])
-    total_samples = 1408 #2*num_ggf # + num_vbf
+    total_samples = 2*num_ggf #num_ggf + num_vbf  # had to do this because new input based model requires multiple of batchsize as input 
     labels = np.zeros((total_samples, 2))
-    # ggf are labelled 1 and vbf are labeled 0 
-    # a -1 / 1 labelling might be preferable depending on architecture eg SVM
     labels[0 : num_ggf, 0] = 1
     labels[num_ggf:, 1] = 1
     # 3dimensional tensor. The first dimension indexes into a particular image of size DIM_PHIxDIM_ETA
     data_samples = np.zeros((total_samples, DIM_PHI, DIM_ETA))
+    data_htsoft = np.zeros((1, total_samples))
     for i in range(num_ggf):
         trk_pt  = unprocessed_data[0]["trk_pt"][i]
         trk_phi = unprocessed_data[0]["trk_phi"][i]
@@ -37,6 +36,7 @@ def extract_imagedata(whole_img=False, normalization=0):
         if not whole_img:
             trk_pt, trk_phi, trk_eta = get_background_event(trk_pt, unprocessed_data[0]["trk_code"][i], trk_eta, trk_phi)
         result, dum_x_edges, dum_y_edges = np.histogram2d(trk_eta, trk_phi , bins=(x_edges, y_edges), range=None, normed=False, weights=trk_pt)
+        ht = np.sum(result)
         if normalization is 1:
             result = result - np.mean(result)
             result = result/ np.sqrt(np.sum(np.square(result)))
@@ -46,14 +46,16 @@ def extract_imagedata(whole_img=False, normalization=0):
             HTSoft = np.sum(result)
             result = result / HTSoft
         data_samples[i, :, :] =  np.flipud(result.T)  # to make eta increase from left to right and phi from bottom up.
-    
-    for i in range(total_samples - num_ggf): #range(num_ggf):#range(num_vbf):
+        data_htsoft[:, i] = ht
+
+    for i in range(num_ggf): #range(num_vbf):
         trk_pt  = unprocessed_data[1]["trk_pt"][i]
         trk_phi = unprocessed_data[1]["trk_phi"][i]
         trk_eta = unprocessed_data[1]["trk_eta"][i]
         if not whole_img:
             trk_pt, trk_phi, trk_eta = get_background_event(trk_pt, unprocessed_data[1]["trk_code"][i], trk_eta, trk_phi)
         result, dum_x_edges, dum_y_edges = np.histogram2d(trk_eta, trk_phi, bins=(x_edges, y_edges), range=None, normed=False, weights=trk_pt)
+        ht = np.sum(result)
         if normalization is 1:
             result = result - np.mean(result)
             result = result/ np.sqrt(np.sum(np.square(result)))
@@ -63,12 +65,16 @@ def extract_imagedata(whole_img=False, normalization=0):
             HTSoft = np.sum(result)
             result = result / HTSoft
         data_samples[(i + num_ggf), :, :] =  np.flipud(result.T)  # to make eta increase from left to right and phi from bottom up.
+        data_htsoft[:, i + num_ggf] = ht
 
+    if normalization is 0:
+        data_htsoft = data_htsoft/np.median(data_htsoft)
     #shuffle the data
     perm = np.random.permutation(total_samples);
     data_samples = data_samples[perm, :, :]
     labels = labels[perm, :] 
-    return data_samples, labels
+    data_htsoft = data_htsoft[:, perm]
+    return data_samples, labels, data_htsoft
 
 def get_background_event(track_pts, trk_codes, trk_eta, trk_phi):
     code = trk_codes == BACKGROUND_INDEX

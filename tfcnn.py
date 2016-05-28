@@ -10,14 +10,16 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 
 #Iterate through the dataset
-def data_iterator(orig_X, orig_y=None, batch_size=32, label_size=2, shuffle=False):
+def data_iterator(orig_X, orig_htsoft, orig_y=None, batch_size=32, label_size=2, shuffle=False):
   # Optionally shuffle the data before training
   if shuffle:
     indices = np.random.permutation(len(orig_X))
     data_X = orig_X[indices]
+    data_htsoft = orig_htsoft[indices]
     data_y = orig_y[indices] if np.any(orig_y) else None
   else:
     data_X = orig_X
+    data_htsoft = orig_htsoft
     data_y = orig_y
   ###
   total_processed_examples = 0
@@ -26,6 +28,7 @@ def data_iterator(orig_X, orig_y=None, batch_size=32, label_size=2, shuffle=Fals
     # Create the batch by selecting up to batch_size elements
     batch_start = step * batch_size
     x = data_X[batch_start:batch_start + batch_size]
+    ht = data_htsoft[:, batch_start:batch_start + batch_size]
     # Convert our target from the class index to a one hot vector
     y = None
     if np.any(data_y):
@@ -34,7 +37,7 @@ def data_iterator(orig_X, orig_y=None, batch_size=32, label_size=2, shuffle=Fals
     #   y = np.zeros((len(x), label_size), dtype=np.int32)
     #   y[np.arange(len(y_indices)), y_indices] = 1
     ###
-    yield x, y
+    yield x, y, ht
     total_processed_examples += len(x)
   # Sanity check to make sure we iterated over all the dataset as intended
   assert total_processed_examples == len(data_X), 'Expected {} and processed {}'.format(len(data_X), total_processed_examples)
@@ -47,16 +50,17 @@ class Config(object):
   information parameters. Model objects are passed a Config() object at
   instantiation.
   """
-  DIM_ETA = 52
-  DIM_PHI = 64
+  DIM_ETA = 54
+  DIM_PHI = 66
   num_channels = 1
   num_classes = 2
   dropout = 0.9
   lr = 1e-4
-  final_size = 208
+  final_size = 54
   batch_size = 128
-  num_train = 1024 #2432
+  frac_train = 0.7
   max_epoch = 20
+  class_ratio = 0.2
   early_stopping = 2
 
 class HEPModel(object):
@@ -66,16 +70,17 @@ class HEPModel(object):
 
 	    Feel free to add instance variables to Model object that store loaded data.    
 	    """
-	    data_samples, labels = extract_imagedata(normalization=0)
+	    data_samples, labels, htsoft = extract_imagedata(normalization=0)
 	    aug_data = data_samples.reshape((data_samples.shape[0], data_samples.shape[1], data_samples.shape[2], 1))
-	    print (data_samples.shape[0])
-	    self.X_train = aug_data[:self.config.num_train, :, :, :]
-	    self.Y_train = labels[:self.config.num_train, :]
-	    self.X_test = aug_data[self.config.num_train:, :, :, :]
-	    print self.X_train.shape
-	    print self.X_test.shape
-	    self.Y_test = labels[self.config.num_train: ,  :]
-
+	    total_batches = np.floor(data_samples.shape[0]/self.config.batch_size)
+	    num_train = np.floor(self.config.frac_train*total_batches) * self.config.batch_size
+	    num_train = int(num_train)
+	    self.X_train = aug_data[:num_train, :, :, :]
+	    self.Y_train = labels[:num_train, :]
+	    self.htsoft_train = htsoft[:, :num_train]
+	    self.X_test = aug_data[num_train:int(total_batches*self.config.batch_size), :, :, :]
+	    self.htsoft_test = htsoft[:, num_train:int(total_batches*self.config.batch_size)]
+	    self.Y_test = labels[num_train:int(total_batches*self.config.batch_size) ,  :]
 
 
 	def add_placeholders(self):
@@ -92,9 +97,10 @@ class HEPModel(object):
 	    """
 	    self.input_placeholder = tf.placeholder(tf.float32, shape=(None, self.config.DIM_PHI, self.config.DIM_ETA, self.config.num_channels))
 	    self.labels_placeholder = tf.placeholder(tf.float32, shape=(None, self.config.num_classes))
+	    self.htsoft_placeholder = tf.placeholder(tf.float32, shape=(1, None))
 	    self.dropout_placeholder = tf.placeholder(tf.float32)
 
-	def create_feed_dict(self, input_batch, dropout, label_batch=None):
+	def create_feed_dict(self, input_batch, dropout, htsoft, label_batch=None):
 	    """Creates the feed_dict for training the given step.
 
 	    A feed_dict takes the form of:
@@ -117,7 +123,8 @@ class HEPModel(object):
 	    """
 	    feed_dict = {
 	      self.input_placeholder : input_batch,
-	      self.dropout_placeholder : dropout
+	      self.dropout_placeholder : dropout,
+	      self.htsoft_placeholder : htsoft
 	    }
 	    if label_batch is not None:
 	    	feed_dict[self.labels_placeholder] = label_batch
@@ -127,29 +134,27 @@ class HEPModel(object):
 		with tf.variable_scope("FirstConv") as CLayer1:
 			w_conv1 = tf.get_variable("w_conv1", (11, 11, 1, 32), initializer=tf.truncated_normal_initializer(stddev=0.1))
 			b_conv1 = tf.get_variable("b_conv1", (32), initializer=tf.constant_initializer(0.1))
-			conv1 =   tf.nn.conv2d(input_data, w_conv1, strides=[1, 1, 1, 1], padding='SAME')
+			conv1 =   tf.nn.conv2d(input_data, w_conv1, strides=[1, 1, 1, 1], padding='VALID')
 			hconv1 =  tf.nn.relu(conv1 + b_conv1)
-			h_pool1 = tf.nn.max_pool(hconv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+			h_pool1 = tf.nn.max_pool(hconv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
 			with tf.variable_scope("SecondConv") as CLayer2:
 				w_conv2 = tf.get_variable("w_conv2", (11 , 11, 32, 64), initializer=tf.truncated_normal_initializer(stddev=0.1))
 				b_conv2 = tf.get_variable("b_conv2", (64), initializer=tf.constant_initializer(0.1))
-				conv2 =   tf.nn.conv2d(h_pool1, w_conv2, strides=[1, 1, 1, 1], padding='SAME')
+				conv2 =   tf.nn.conv2d(h_pool1, w_conv2, strides=[1, 1, 1, 1], padding='VALID')
 				hconv2 =  tf.nn.relu(conv2 + b_conv2)
-				h_pool2 = tf.nn.max_pool(hconv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+				h_pool2 = tf.nn.max_pool(hconv2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='VALID')
 				with tf.variable_scope("FullyConnected") as FC:
 					flattend_input = tf.reshape(input_data, [self.config.batch_size, -1])
 					w_input = tf.get_variable("w_input", (self.config.DIM_ETA*self.config.DIM_PHI, 32), initializer=tf.truncated_normal_initializer(stddev=0.1))
 					wfc1 = tf.get_variable("wfc1", (self.config.final_size*64, 32), initializer=tf.truncated_normal_initializer(stddev=0.1))
 					#bfc1 = tf.get_variable("bfc1", (32), initializer=tf.constant_initializer(0.1))
 					h_pool2_flat = tf.reshape(h_pool2, [-1, self.config.final_size*64])
-					h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, wfc1) + tf.matmul(flattend_input, w_input))#+ bfc1)
+					h_fc1 = tf.nn.relu(tf.matmul(h_pool2_flat, wfc1) + tf.matmul(flattend_input, w_input))#+  bfc1) 
 					h_fc1_drop = tf.nn.dropout(h_fc1, self.dropout_placeholder) 
 					with tf.variable_scope("ReadoutLayer") as RL:
-						# flattend_input = tf.reshape(input_data, [self.config.batch_size, -1])
-						# w_input = tf.get_variable("w_input", (self.config.DIM_ETA*self.config.DIM_PHI, self.config.num_classes), initializer=tf.truncated_normal_initializer(stddev=0.1))
 						wfc2 = tf.get_variable("wfc2", (32, self.config.num_classes), initializer=tf.truncated_normal_initializer(stddev=0.1))
 						bfc2 = tf.get_variable("bfc2", (self.config.num_classes), initializer=tf.constant_initializer(0.1))
-						y_conv = tf.matmul(h_fc1_drop, wfc2)  + bfc2 #tf.matmul(flattend_input, w_input) #
+						y_conv = tf.matmul(h_fc1_drop, wfc2)  + bfc2 
 		return y_conv
 
 	def add_loss_op(self, pred):
@@ -163,6 +168,8 @@ class HEPModel(object):
 	    #Hinge Loss
 	    #pred = tf.nn.softmax(pred)
 	    #loss = tf.reduce_mean(tf.maximum( 0.0, (1.0 - self.labels_placeholder)*pred - self.labels_placeholder*pred + 1.0 ))
+	    #class_weights = tf.constant([1.0 - self.config.class_ratio, self.config.class_ratio])
+	    #weighted_logits = tf.mul(pred, class_weights)
 	    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(pred, self.labels_placeholder))
 	    return loss
 
@@ -202,18 +209,17 @@ class HEPModel(object):
 	  	self.correct_predictions = tf.reduce_sum(tf.cast(correct_prediction, 'int32'))
 	  	self.train_op = self.add_training_op(self.loss)
 
-	def run_epoch(self, sess, input_data, input_labels):
+	def run_epoch(self, sess, input_data, input_labels, htsoft):
 
-	    orig_X, orig_y = input_data, input_labels
+	    orig_X, orig_y, orig_htsoft = input_data, input_labels, htsoft
 	    dp = self.config.dropout
 	    total_loss = []
 	    total_correct_examples = 0
 	    total_processed_examples = 0
 	    total_steps = len(orig_X) / self.config.batch_size
-	    for step, (x, y) in enumerate(data_iterator(orig_X, orig_y, batch_size=self.config.batch_size,
+	    for step, (x, y, ht) in enumerate(data_iterator(orig_X, orig_htsoft, orig_y, batch_size=self.config.batch_size,
 	                   label_size=self.config.num_classes)):
-
-	        feed = self.create_feed_dict(input_batch=x, dropout=dp, label_batch=y)
+	        feed = self.create_feed_dict(input_batch=x, dropout=dp, htsoft=ht, label_batch=y)
 	        loss, total_correct, _ = session.run(
 	          [self.loss, self.correct_predictions, self.train_op],
 	          feed_dict=feed)
@@ -228,7 +234,7 @@ class HEPModel(object):
 	    return np.mean(total_loss), total_correct_examples / float(total_processed_examples)
 
 
-	def predict(self, sess, input_data, input_classes):
+	def predict(self, sess, input_data, input_classes, htsoft):
 	    """Make predictions from the provided model.
 	    Args:
 	      sess: tf.Session()
@@ -242,11 +248,11 @@ class HEPModel(object):
 	    losses = []
 	    results = []
 	    predictions_scores = []
-	    data = data_iterator(input_data, batch_size=self.config.batch_size,
+	    data = data_iterator(input_data, htsoft, batch_size=self.config.batch_size,
 	                             label_size=self.config.num_classes)
 	    first = True
-	    for step, (x, y) in enumerate(data):
-	      feed = self.create_feed_dict(input_batch=x, dropout=dp)
+	    for step, (x, y, ht) in enumerate(data):
+	      feed = self.create_feed_dict(input_batch=x, dropout=dp, htsoft=ht)
 	      preds = session.run(self.predictions, feed_dict=feed)
 	      preds = np.array(preds)
 	      if first:
@@ -259,10 +265,6 @@ class HEPModel(object):
 
 	    flattened_classes = np.array(input_classes.argmax(axis=1))
 	    accuracy = sum(np.array(results) == flattened_classes)/float(len(flattened_classes))
-	    print 'Num vbf'
-	    print np.sum(flattened_classes)
-	    print 'Total objects'
-	    print len(flattened_classes)
 	    print 'Accuracy on Test'
 	    print accuracy
 	    indices = np.arange(flattened_classes.shape[0])
@@ -272,8 +274,6 @@ class HEPModel(object):
 	    print area_under_curve
 	    print 'Mean loss'
 	    print np.mean(losses)
-	    print flattened_classes[0:5]
-	    print corresponding_scores[0:5]
 	    fpr, tpr , thresholds = roc_curve(flattened_classes, corresponding_scores)
 	    plt.ylabel('True Positive Rate')
 	    plt.xlabel('False Positive Rate')
@@ -281,7 +281,7 @@ class HEPModel(object):
 	    print 'This is the area'
 	    print area
 	    plt.plot(fpr, tpr)
-	    title = "CNN Graph-CE-5050-16OUT"
+	    title = "CNNGraph-CE-Ydep-LargeData"
 	    plt.figtext(.4, .5, "AUC : " + str(area))
 	    pp = PdfPages(title + ".pdf")
 	    plt.savefig(pp, format="pdf")
@@ -302,14 +302,14 @@ with tf.Graph().as_default():
       	for epoch in xrange(config.max_epoch):
       		print 'Epoch {}'.format(epoch)
      		train_loss, train_acc = model.run_epoch(session, model.X_train,
-                                                model.Y_train)
+                                                model.Y_train, model.htsoft_train)
         	print 'Training loss: {}'.format(train_loss)
         	print 'Training acc: {}'.format(train_acc)
         	if train_loss < best_val_loss:
          	 	best_val_loss = train_loss
           		best_val_epoch = epoch
-          	if epoch - best_val_epoch > config.early_stopping:
-          		break	
+          	# if epoch - best_val_epoch > config.early_stopping:
+          	# 	break	
 
-    	val_loss, predictions = model.predict(session, model.X_test, model.Y_test)
+    	val_loss, predictions = model.predict(session, model.X_test, model.Y_test, model.htsoft_test)
 
