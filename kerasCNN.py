@@ -20,20 +20,10 @@ DIM_PHI = 64
 TRAIN_FRAC = 0.9
 BATCH_SIZE = 128
 NUM_EPOCHS = 20
-REGULARIZATION = 1e-3
+REGULARIZATION = 1e-4
+CLASS_WEIGHTS = {0: 0.8, 1:0.2}
 
-class LossHistory(keras.callbacks.Callback):
-    def on_train_begin(self, logs={}):
-        self.losses = []
-        self.poor = []
-        self.first = True
-        self.losses.append(logs.get('loss'))
-
-    def on_batch_end(self, batch, logs={}):
-        self.losses.append(logs.get('loss'))
-
-
-data_samples, labels, htsoft = extract_imagedata(normalization=1)
+data_samples, labels, htsoft = extract_imagedata(normalization=0)
 data_samples = data_samples.reshape((data_samples.shape[0], 1,  data_samples.shape[1], data_samples.shape[2]))
 num_train = int(np.floor(TRAIN_FRAC*data_samples.shape[0]))
 
@@ -60,16 +50,13 @@ merged = Merge([model, inputDependence], mode='sum')
 merged_model.add(merged)
 merged_model.add(Dropout(0.1))
 merged_model.add(Activation('relu'))
-merged_model.add(Dense(2, W_regularizer=l2(REGULARIZATION)))
+merged_model.add(Dense(2, activation="softmax", W_regularizer=l2(REGULARIZATION)))
 
 
 
 optim = Adam(lr=1e-4)
 merged_model.compile(loss="categorical_crossentropy", optimizer=optim,  metrics=['accuracy'])
-history = LossHistory()
-merged_model.fit([x_train, x_train], y_train, callbacks=[history], batch_size=BATCH_SIZE, nb_epoch=NUM_EPOCHS, validation_split=0.3)
-#print history.losses
-print history.losses
+merged_model.fit([x_train, x_train], y_train, class_weight=CLASS_WEIGHTS, batch_size=BATCH_SIZE, nb_epoch=NUM_EPOCHS, validation_split=0.3)
 score = merged_model.evaluate([x_test, x_test], y_test, batch_size=BATCH_SIZE)
 
 predictions_scores = merged_model.predict_proba([x_test, x_test], batch_size=x_test.shape[0])

@@ -22,7 +22,7 @@ def extract_imagedata(whole_img=False, normalization=0):
     unprocessed_data = get_unprocesseddata()
     num_ggf = len(unprocessed_data[0])
     num_vbf = len(unprocessed_data[1])
-    total_samples = 2*num_ggf #num_ggf + num_vbf  # had to do this because new input based model requires multiple of batchsize as input 
+    total_samples = num_ggf + num_vbf  # had to do this because new input based model requires multiple of batchsize as input 
     labels = np.zeros((total_samples, 2))
     labels[0 : num_ggf, 0] = 1
     labels[num_ggf:, 1] = 1
@@ -39,16 +39,21 @@ def extract_imagedata(whole_img=False, normalization=0):
         ht = np.sum(result)
         if normalization is 1:
             result = result - np.mean(result)
-            result = result/ np.sqrt(np.sum(np.square(result)))
+            variance = np.sqrt(np.sum(np.square(result)))
+            variance = 1 if variance == 0 else variance
+            result = result / variance
         elif normalization is 0:
-            result = result/np.max(result)
+            max_val = np.max(result)
+            max_val = 1 if max_val == 0 else max_val
+            result = result / max_val
         elif normalization is 2:
             HTSoft = np.sum(result)
+            HTSoft = 1 if HTSoft == 0 else HTSoft
             result = result / HTSoft
         data_samples[i, :, :] =  np.flipud(result.T)  # to make eta increase from left to right and phi from bottom up.
         data_htsoft[:, i] = ht
 
-    for i in range(num_ggf): #range(num_vbf):
+    for i in range(num_vbf):
         trk_pt  = unprocessed_data[1]["trk_pt"][i]
         trk_phi = unprocessed_data[1]["trk_phi"][i]
         trk_eta = unprocessed_data[1]["trk_eta"][i]
@@ -58,11 +63,16 @@ def extract_imagedata(whole_img=False, normalization=0):
         ht = np.sum(result)
         if normalization is 1:
             result = result - np.mean(result)
-            result = result/ np.sqrt(np.sum(np.square(result)))
+            variance = np.sqrt(np.sum(np.square(result)))
+            variance = 1 if variance == 0 else variance
+            result = result / variance
         elif normalization is 0:
-            result = result/np.max(result)
+            max_val = np.max(result)
+            max_val = 1 if max_val == 0 else max_val
+            result = result / max_val
         elif normalization is 2:
             HTSoft = np.sum(result)
+            HTSoft = 1 if HTSoft == 0 else HTSoft
             result = result / HTSoft
         data_samples[(i + num_ggf), :, :] =  np.flipud(result.T)  # to make eta increase from left to right and phi from bottom up.
         data_htsoft[:, i + num_ggf] = ht
@@ -97,5 +107,5 @@ def extract_background_pt():
     num_ggf = len(unprocessed_data[0])
     num_vbf = len(unprocessed_data[1])
     ggf_totalpts = get_background_pt(unprocessed_data[0]["trk_pt"], unprocessed_data[0]["trk_code"], num_ggf)
-    vbf_totalpts = get_background_pt(unprocessed_data[1]["trk_pt"], unprocessed_data[1]["trk_code"], num_ggf)
+    vbf_totalpts = get_background_pt(unprocessed_data[1]["trk_pt"], unprocessed_data[1]["trk_code"], num_vbf)
     return ggf_totalpts, vbf_totalpts

@@ -8,6 +8,8 @@ from sklearn import metrics
 
 NUM_CRITICAL_POINTS = 100;
 ggf_bg_pts, vbf_bg_pts = extract_background_pt()
+print ggf_bg_pts.shape
+print vbf_bg_pts.shape
 critical_points =  np.linspace(np.min(ggf_bg_pts), np.max(ggf_bg_pts), NUM_CRITICAL_POINTS)
 efficiencies = np.zeros((NUM_CRITICAL_POINTS, 2))
 num_ggf = 1.0*len(ggf_bg_pts)
@@ -24,7 +26,7 @@ plt.ylabel('True Positive VBF (correctly labeled VBF)')
 plt.xlabel('False Positive GGF (incorrectly labeled GGF)')
 area = metrics.auc(efficiencies[:,0], efficiencies[:,1])#np.trapz(efficiencies[:,1], x=efficiencies[:,0])
 plt.plot(efficiencies[:,0], efficiencies[:,1])
-title = "HTSoft Graph"
+title = "HTSoft Graph:Unequal Classes"
 plt.figtext(.4, .5, "AUC : " + str(area))
 pp = PdfPages(title + ".pdf")
 plt.savefig(pp, format="pdf")
