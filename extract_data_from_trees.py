@@ -5,9 +5,10 @@ BACKGROUND_INDEX = 0
 DIM_ETA = 52
 DIM_PHI = 64
 
+#Extracts the vbf and ggf example from the trees and puts them into a list.
 def get_unprocesseddata():
     leaves = ["trk_pt", "trk_phi", "trk_eta", "trk_e", "trk_code"]
-    unprocessed_data = [root2rec("tracks/outtree2_ggf.root", "outtree", leaves), root2rec("tracks/outtree2_vbf.root", "outtree", leaves)]
+    unprocessed_data = [root2rec("tracks/outtree3_ggf.root", "outtree", leaves), root2rec("tracks/outtree2_vbf.root", "outtree", leaves)]
     return unprocessed_data
 
 def extract_imagedata(whole_img=False, normalization=0):
@@ -15,17 +16,20 @@ def extract_imagedata(whole_img=False, normalization=0):
     #Output :
     #data_samples : a NUM_SAMPLES x DIM_PHI x DIM_ETA matrix of event images 
     #labels : a NUM_SAMPLE x 2 vector of labels corresponding to these images ggf at index 0 and vbf at index 1
-
+    #normalizations
+    # 0     -       divide by maximum
+    # 1     -       zero mean and unit variance
+    # 2     -       scale out htsoft to 1
+    # 3     -       scale data_htsoft by its median
     #based on bin size of 0.1x0.1
-    x_edges, y_edges = np.linspace(-2.5, 2.5, DIM_ETA + 1), np.linspace(-3.2, 3.16, DIM_PHI + 1)
-
+    x_edges, y_edges = np.linspace(-2.5, 2.5, DIM_ETA + 1), np.linspace(-3.2, 3.16, DIM_PHI + 1) # + 1 because histogram2d leaves out boundary terms.
     unprocessed_data = get_unprocesseddata()
     num_ggf = len(unprocessed_data[0])
     num_vbf = len(unprocessed_data[1])
-    total_samples = num_ggf + num_vbf  # had to do this because new input based model requires multiple of batchsize as input 
+    total_samples =  num_vbf + num_ggf # change to  2*num_vbf or 2*num_ggf (if num_ggf > num_vbf) for balanced distribution
     labels = np.zeros((total_samples, 2))
-    labels[0 : num_ggf, 0] = 1
-    labels[num_ggf:, 1] = 1
+    labels[0 : num_vbf, 0] = 1
+    labels[num_vbf:, 1] = 1
     # 3dimensional tensor. The first dimension indexes into a particular image of size DIM_PHIxDIM_ETA
     data_samples = np.zeros((total_samples, DIM_PHI, DIM_ETA))
     data_htsoft = np.zeros((1, total_samples))
@@ -46,7 +50,8 @@ def extract_imagedata(whole_img=False, normalization=0):
             max_val = np.max(result)
             max_val = 1 if max_val == 0 else max_val
             result = result / max_val
-        elif normalization is 2:
+        elif normalization is 2: #takes out htsoft dependence from data.  Thus, any algorithm taking data in this format has to learn other things
+                                #things about the data apart from htsoft.
             HTSoft = np.sum(result)
             HTSoft = 1 if HTSoft == 0 else HTSoft
             result = result / HTSoft
@@ -74,11 +79,13 @@ def extract_imagedata(whole_img=False, normalization=0):
             HTSoft = np.sum(result)
             HTSoft = 1 if HTSoft == 0 else HTSoft
             result = result / HTSoft
-        data_samples[(i + num_ggf), :, :] =  np.flipud(result.T)  # to make eta increase from left to right and phi from bottom up.
-        data_htsoft[:, i + num_ggf] = ht
+        data_samples[(i + num_vbf), :, :] =  np.flipud(result.T) #remember to change back to num_ggf # to make eta increase from left to right and phi from bottom up.
+        data_htsoft[:, i + num_vbf] = ht
 
-    if normalization is 0:
+    #Not sure this normalization regime would work well.
+    if normalization is 3:
         data_htsoft = data_htsoft/np.median(data_htsoft)
+
     #shuffle the data
     perm = np.random.permutation(total_samples);
     data_samples = data_samples[perm, :, :]
@@ -86,6 +93,8 @@ def extract_imagedata(whole_img=False, normalization=0):
     data_htsoft = data_htsoft[:, perm]
     return data_samples, labels, data_htsoft
 
+
+#Get the eta, phi and pt for the tracks in the background
 def get_background_event(track_pts, trk_codes, trk_eta, trk_phi):
     code = trk_codes == BACKGROUND_INDEX
     track_pts = track_pts[code]
