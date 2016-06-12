@@ -6,10 +6,19 @@ from scipy.integrate import simps
 from sklearn import metrics
 
 
-NUM_CRITICAL_POINTS = 100;
-ggf_bg_pts, vbf_bg_pts = extract_background_pt()
-print ggf_bg_pts.shape
-print vbf_bg_pts.shape
+NUM_CRITICAL_POINTS = 1000;
+# ggf_bg_pts, vbf_bg_pts = extract_background_pt()
+#using saved data
+labels = np.load("save_path/labels.npy")
+ht = np.load("save_path/ht.npy")
+ht = ht.reshape(ht.shape[1],)
+num_test_start = int(np.floor((0.9)*len(labels)))
+labels = labels[num_test_start:, :]
+ht = ht[num_test_start:]
+associated_class = np.array(labels.argmax(axis=1))
+ggf_bg_pts = ht[associated_class == 0]
+vbf_bg_pts = ht[associated_class == 1]
+
 critical_points =  np.linspace(np.min(ggf_bg_pts), np.max(ggf_bg_pts), NUM_CRITICAL_POINTS)
 efficiencies = np.zeros((NUM_CRITICAL_POINTS, 2))
 num_ggf = 1.0*len(ggf_bg_pts)
@@ -26,7 +35,7 @@ plt.ylabel('True Positive VBF (correctly labeled VBF)')
 plt.xlabel('False Positive GGF (incorrectly labeled GGF)')
 area = metrics.auc(efficiencies[:,0], efficiencies[:,1])#np.trapz(efficiencies[:,1], x=efficiencies[:,0])
 plt.plot(efficiencies[:,0], efficiencies[:,1])
-title = "HTSoft Graph:Unequal Classes"
+title = "HTSoft Graph: Equal Classes"
 plt.figtext(.4, .5, "AUC : " + str(area))
 pp = PdfPages(title + ".pdf")
 plt.savefig(pp, format="pdf")
