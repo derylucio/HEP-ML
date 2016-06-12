@@ -50,8 +50,8 @@ class Config(object):
   information parameters. Model objects are passed a Config() object at
   instantiation.
   """
-  DIM_ETA = 54
-  DIM_PHI = 66
+  DIM_ETA = 52
+  DIM_PHI = 64
   num_channels = 1
   num_classes = 2
   dropout = 0.9
@@ -184,9 +184,6 @@ class HEPModel(object):
 
 	    for more information.
 
-	    Hint: Use tf.train.AdamOptimizer for this model.
-	          Calling optimizer.minimize() will return a train_op object.
-
 	    Args:
 	      loss: Loss tensor, from cross_entropy_loss.
 	    Returns:
@@ -267,21 +264,15 @@ class HEPModel(object):
 	    accuracy = sum(np.array(results) == flattened_classes)/float(len(flattened_classes))
 	    print 'Accuracy on Test'
 	    print accuracy
-	    indices = np.arange(flattened_classes.shape[0])
-	    corresponding_scores = predictions_scores[indices, flattened_classes]
-	    area_under_curve = roc_auc_score(flattened_classes, corresponding_scores)
-	    print 'Here is the roc_auc_score 1'
-	    print area_under_curve
-	    print 'Mean loss'
-	    print np.mean(losses)
+	    corresponding_scores = predictions_scores[:, 1]
 	    fpr, tpr , thresholds = roc_curve(flattened_classes, corresponding_scores)
 	    plt.ylabel('True Positive Rate')
 	    plt.xlabel('False Positive Rate')
-	    area = auc(fpr, tpr)#np.trapz(efficiencies[:,1], x=efficiencies[:,0])
-	    print 'This is the area'
+	    area = auc(fpr, tpr)
+	    print 'Test Area Under Curve'
 	    print area
 	    plt.plot(fpr, tpr)
-	    title = "CNNGraph-CE-Ydep-LargeData"
+	    title = "Tensor Flow CNN"
 	    plt.figtext(.4, .5, "AUC : " + str(area))
 	    pp = PdfPages(title + ".pdf")
 	    plt.savefig(pp, format="pdf")
@@ -308,8 +299,7 @@ with tf.Graph().as_default():
         	if train_loss < best_val_loss:
          	 	best_val_loss = train_loss
           		best_val_epoch = epoch
-          	# if epoch - best_val_epoch > config.early_stopping:
-          	# 	break	
-
+          	if epoch - best_val_epoch > config.early_stopping:
+          		break	
     	val_loss, predictions = model.predict(session, model.X_test, model.Y_test, model.htsoft_test)
 
